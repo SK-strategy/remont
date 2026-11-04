@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Конструктор сметы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=cyrillic" rel="stylesheet">
+<style>
+/* Layout idea: рабочий инструмент в одну колонку, сверху переключатель ролей, ниже карточки комнат и таблица сметы. */
+:root{
+  --bg:#eceff1; --surface:#ffffff; --ink:#1b2428; --muted:#5a6870; --line:#d3dade;
+  --accent:#1b57c4; --accent-ink:#ffffff; --soft:#e4ecfb; --ok:#1c7a46; --warn:#a85d00; --warn-bg:#fdf0dc; --ok-bg:#e0f3e8;
+  --display:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101619; --surface:#192125; --ink:#e5eaed; --muted:#97a6ae; --line:#2b373d;
+    --accent:#78a6ff; --accent-ink:#0c1a33; --soft:#1f2d45; --ok:#62c78c; --warn:#f0b458; --warn-bg:#3a2d14; --ok-bg:#16332358;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101619; --surface:#192125; --ink:#e5eaed; --muted:#97a6ae; --line:#2b373d;
+  --accent:#78a6ff; --accent-ink:#0c1a33; --soft:#1f2d45; --ok:#62c78c; --warn:#f0b458; --warn-bg:#3a2d14; --ok-bg:#16332358;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+body{min-height:100%}
+.wrap{max-width:1000px;margin:0 auto;padding:16px 16px 120px}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:26px} h2{font-size:19px} h3{font-size:15px}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+.brand{display:flex;flex-direction:column}
+.brand small{color:var(--muted)}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.seg button{border:0;background:none;padding:8px 14px;border-radius:7px;font-weight:500;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.note{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.between{justify-content:space-between}
+.grow{flex:1 1 auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
+input[type=text],select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:40px;width:100%}
+input[type=text]:focus,select:focus{border-color:var(--accent)}
+input.n{font-family:var(--mono);text-align:right}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 14px;min-height:40px;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--warn)}
+.btn.sm{min-height:32px;padding:4px 10px;font-size:13px}
+.btn.ghost{background:none}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:500;background:var(--soft);color:var(--accent)}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}
+.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.tile b{display:block;font-family:var(--mono);font-size:20px;font-weight:500}
+.tile span{font-size:12px;color:var(--muted)}
+.obj{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.obj:hover{border-color:var(--accent)}
+.obj .a{font-weight:600}
+.obj .m{color:var(--muted);font-size:13px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.room-h{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;width:100%;background:none;border:0;padding:0;text-align:left}
+.room-h .t{font-family:var(--display);font-weight:600;font-size:17px}
+.room-h .s{color:var(--muted);font-size:13px}
+.plan{width:130px;height:84px;flex:none;background:var(--bg);border-radius:8px}
+.plan rect{fill:var(--soft);stroke:var(--accent);stroke-width:1.5}
+.plan text{fill:var(--muted);font-size:9px;font-family:var(--mono)}
+.op{display:grid;grid-template-columns:1.6fr 1fr 1fr auto;gap:8px;align-items:end}
+.wg{margin-top:4px}
+.wg h3{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin:10px 0 4px}
+.wk{display:grid;grid-template-columns:1fr 96px;gap:8px;align-items:center;padding:4px 0;border-bottom:1px dashed var(--line)}
+.wk label{display:flex;gap:10px;align-items:center;min-height:36px}
+.wk input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
+.wk .u{color:var(--muted);font-size:12px}
+.wk select{min-height:34px;padding:4px 8px}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:10px 16px}
+.bar .in{max-width:1000px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.tw{overflow-x:auto}
+table.est{width:100%;border-collapse:collapse;min-width:640px}
+table.est th{font-size:12px;color:var(--muted);text-align:left;font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line)}
+table.est td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.est tr.g td{background:var(--bg);font-family:var(--display);font-weight:600;padding:6px 8px}
+table.est .det{font-size:12px;color:var(--muted)}
+table.est input.n{width:100px;min-height:34px;padding:4px 8px}
+table.est input.ov{border-color:var(--accent);background:var(--soft)}
+table.est td.sum{text-align:right;font-family:var(--mono);white-space:nowrap}
+.tot{display:flex;flex-direction:column;gap:6px;align-items:flex-end;margin-top:12px}
+.tot div{display:flex;gap:16px;align-items:center}
+.tot .big{font-family:var(--mono);font-size:22px;font-weight:500}
+.paper{background:#fff;color:#1b2428;border:1px solid #cfd6da;border-radius:6px;padding:32px 28px;max-width:760px;margin:0 auto;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.paper h2{font-size:22px;margin-bottom:4px}
+.paper table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+.paper th{background:#eef1f3;text-align:left;padding:6px 8px;font-size:12px}
+.paper td{padding:6px 8px;border-bottom:1px solid #dde3e6}
+.paper td.r,.paper th.r{text-align:right;font-family:var(--mono);white-space:nowrap}
+.paper .g td{font-weight:600;background:#f6f8f9}
+.paper .meta{color:#5a6870;font-size:13px}
+.paper .total{text-align:right;font-family:var(--mono);font-size:20px;margin-top:8px}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;max-width:90%;z-index:10}
+.empty{color:var(--muted);text-align:center;padding:28px 12px}
+@media (max-width:560px){
+  h1{font-size:22px}
+  .op{grid-template-columns:1fr 1fr 1fr auto}
+  .op label.kind{grid-column:1 / -1}
+  .paper{padding:20px 14px}
+}
+@media (prefers-reduced-motion: no-preference){ .btn,.obj{transition:border-color .12s} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>Конструктор сметы</h1><small>Замеры на объекте, смета у менеджера, КП клиенту</small></div>
+    <div class="seg" role="group" aria-label="Роль">
+      <button type="button" data-act="role" data-v="foreman" id="r-foreman">Прораб</button>
+      <button type="button" data-act="role" data-v="manager" id="r-manager">Менеджер</button>
+    </div>
+  </header>
+  <div class="note">Прототип. Расценки условные, данные хранятся только в этом браузере. В рабочей версии объекты, прайс и PDF будут на сервере компании.</div>
+  <main id="app"></main>
+</div>
+<div id="bar"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+/* ---------- Справочник работ (условные расценки, ₽) ---------- */
+const GROUPS = ['Демонтаж','Стены','Пол','Потолок'];
+const WORKS = [
+  {key:'dem_wall',   g:'Демонтаж', name:'Демонтаж обоев',            unit:'м²', base:'wall',   price:80},
+  {key:'dem_floor',  g:'Демонтаж', name:'Демонтаж ламината',         unit:'м²', base:'floor',  price:150},
+  {key:'dem_screed', g:'Демонтаж', name:'Демонтаж стяжки пола',      unit:'м²', base:'floor',  price:450},
+  {key:'wall_plast', g:'Стены',    name:'Штукатурка под правило',    unit:'м²', base:'wall',   price:650},
+  {key:'wall_putty', g:'Стены',    name:'Шпатлёвка стен',            unit:'м²', base:'wall',   price:380},
+  {key:'wall_sand',  g:'Стены',    name:'Шлифовка стен',             unit:'м²', base:'wall',   price:120},
+  {key:'wall_paper', g:'Стены',    name:'Поклейка обоев',            unit:'м²', base:'wall',   price:420},
+  {key:'wall_reveal',g:'Стены',    name:'Откосы под покраску',       unit:'пог. м', base:'reveal', price:900},
+  {key:'fl_screed',  g:'Пол',      name:'Стяжка пола',               unit:'м²', base:'floor',  price:700},
+  {key:'fl_lam',     g:'Пол',      name:'Укладка ламината',          unit:'м²', base:'floor',  price:600},
+  {key:'fl_plinth',  g:'Пол',      name:'Монтаж плинтуса (пластик)', unit:'пог. м', base:'plinth', price:200},
+  {key:'ce_paint',   g:'Потолок',  name:'Потолок под покраску',      unit:'м²', base:'ceil',   price:750},
+  {key:'ce_lining',  g:'Потолок',  name:'Обшивка вагонкой (балкон)', unit:'м²', base:'ceil',   price:900}
+];
+const KINDS = {window:'Окно', door:'Дверь', balcony:'Балконный блок'};
+const TYPES = ['Комната','Кухня','Коридор','Санузел','Балкон','Другое'];
+const SHARES = [[1,'100%'],[0.75,'75%'],[0.5,'50%'],[0.25,'25%']];
+
+/* ---------- Состояние ---------- */
+const KEY='remont-estimator-v1';
+const uid=()=>Math.random().toString(36).slice(2,9);
+const num=v=>{const n=parseFloat(String(v==null?'':v).replace(',','.'));return isFinite(n)?n:0};
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const f2=n=>(Math.round(n*100)/100).toLocaleString('ru-RU',{maximumFractionDigits:2});
+const rub=n=>Math.round(n).toLocaleString('ru-RU')+' ₽';
+
+function wset(list,share){const o={};list.forEach(k=>o[k]={on:true,share:(share&&share[k])||1});return o}
+function mkRoom(name,type,l,w,op,works){return {id:uid(),name,type,l,w,h:'',corr:'',op:op.map(([k,ow,oh])=>({id:uid(),k,w:ow,h:oh})),works:works||{}}}
+function seed(){
+  const full=['wall_plast','wall_putty','wall_sand','wall_paper','wall_reveal','fl_screed','fl_lam','fl_plinth','ce_paint','dem_screed','dem_wall','dem_floor'];
+  const half={dem_wall:0.5,dem_floor:0.5};
+  return {objects:[{
+    id:uid(),addr:'Демо: объект по эскизу прораба (размеры приблизительные)',client:'Иванов И. И.',phone:'+7 900 000-00-00',h:'2.7',status:'sent',
+    mgr:{qty:{},price:{},removed:{},custom:[],disc:''},
+    rooms:[
+      mkRoom('Комната 1','Комната','3.4','5.1',[['window','1.1','1.7'],['door','0.9','2.0']],wset(full,half)),
+      mkRoom('Комната 2','Комната','3.6','4.5',[['window','1.6','1.6'],['balcony','1.5','2.3'],['door','0.9','2.0']],wset(full,half)),
+      mkRoom('Коридор','Коридор','1.6','3.2',[['door','0.9','2.0']],wset(['wall_plast','wall_putty','wall_sand','wall_paper','fl_screed','fl_lam','fl_plinth','ce_paint'])),
+      mkRoom('Санузел','Санузел','2.1','1.6',[['door','0.8','2.0']],{}),
+      mkRoom('Балкон','Балкон','4.0','1.6',[['window','1.6','1.6']],wset(['ce_lining']))
+    ]
+  }]};
+}
+function load(){try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null}catch(e){return null}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+let S=load()||seed();
+const ui={view:'foreman',oid:null,tab:'estimate',open:{},confirm:null};
+const curObj=()=>S.objects.find(o=>o.id===ui.oid);
+const findRoom=(o,id)=>o.rooms.find(r=>r.id===id);
+
+/* ---------- Расчёт ---------- */
+function roomCalc(o,r){
+  const H=num(r.h)||num(o.h)||2.7, L=num(r.l), W=num(r.w), P=2*(L+W);
+  let oa=0,rev=0,dw=0;
+  r.op.forEach(x=>{const w=num(x.w),h=num(x.h);oa+=w*h;if(x.k!=='door')rev+=2*h+w;if(x.k!=='window')dw+=w});
+  const floor=Math.max(0,L*W+num(r.corr));
+  return {H,P,floor,wall:Math.max(0,P*H-oa),ceil:floor,plinth:Math.max(0,P-dw),reveal:rev};
+}
+function objTotals(o){
+  const t={floor:0,wall:0,ceil:0};
+  o.rooms.forEach(r=>{const c=roomCalc(o,r);t.floor+=c.floor;t.wall+=c.wall;t.ceil+=c.ceil});
+  return t;
+}
+function estimate(o){
+  const m=o.mgr||(o.mgr={qty:{},price:{},removed:{},custom:[],disc:''});
+  const groups=[],removed=[];let sub=0;
+  GROUPS.forEach(g=>{
+    const lines=[];
+    WORKS.filter(w=>w.g===g).forEach(w=>{
+      const parts=[];let q=0;
+      o.rooms.forEach(r=>{
+        const s=r.works&&r.works[w.key];
+        if(s&&s.on){const v=roomCalc(o,r)[w.base]*(s.share||1);parts.push({room:r.name,q:v});q+=v}
+      });
+      if(!parts.length)return;
+      if(m.removed[w.key]){removed.push(w);return}
+      const qty=m.qty[w.key]!=null?m.qty[w.key]:Math.round(q*100)/100;
+      const price=m.price[w.key]!=null?m.price[w.key]:w.price;
+      const sum=qty*price;sub+=sum;
+      lines.push({key:w.key,name:w.name,unit:w.unit,qty,price,sum,parts,qOv:m.qty[w.key]!=null,pOv:m.price[w.key]!=null});
+    });
+    if(lines.length)groups.push({name:g,lines});
+  });
+  const custom=m.custom.map(c=>({...c,sum:num(c.qty)*num(c.price)}));
+  custom.forEach(c=>sub+=c.sum);
+  const dp=Math.min(100,Math.max(0,num(m.disc)));
+  const disc=sub*dp/100;
+  return {groups,custom,removed,sub,disc,total:sub-disc,dp};
+}
+
+/* ---------- Мини-план комнаты ---------- */
+function planSvg(r){
+  const L=num(r.l),W=num(r.w);
+  if(!L||!W)return '<svg class="plan" viewBox="0 0 130 84" aria-hidden="true"></svg>';
+  const s=Math.min(100/L,58/W),w=L*s,h=W*s,x=(130-w)/2,y=(84-h)/2-4;
+  return `<svg class="plan" viewBox="0 0 130 84" role="img" aria-label="План комнаты"><rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2"/><text x="65" y="80" text-anchor="middle">${f2(L)} × ${f2(W)} м</text></svg>`;
+}
+
+/* ---------- Живые поля ---------- */
+function liveVal(id){
+  const o=curObj();if(!o)return '';
+  const [k,a]=id.split(':');
+  if(k==='rs'){const r=findRoom(o,a);if(!r)return '';const c=roomCalc(o,r);return `${f2(num(r.l))} × ${f2(num(r.w))} м · пол ${f2(c.floor)} м² · стены ${f2(c.wall)} м²`}
+  if(k==='rsvg'){const r=findRoom(o,a);return r?planSvg(r):''}
+  if(k==='tot'){const t=objTotals(o);return a==='rooms'?String(o.rooms.length):f2(t[a])}
+  if(k==='ls'||k==='cs'||k==='t'){
+    const e=estimate(o);
+    if(k==='t')return a==='sub'?rub(e.sub):a==='disc'?'−'+rub(e.disc):rub(e.total);
+    if(k==='ls'){for(const g of e.groups)for(const l of g.lines)if(l.key===a)return rub(l.sum);return ''}
+    const c=e.custom.find(x=>x.id===a);return c?rub(c.sum):'';
+  }
+  return '';
+}
+function updateLive(){document.querySelectorAll('[data-live]').forEach(el=>{el.innerHTML=liveVal(el.dataset.live)})}
+
+/* ---------- Отрисовка: прораб ---------- */
+function statusChip(o){return o.status==='sent'?'<span class="chip ok">Передан менеджеру</span>':'<span class="chip warn">Черновик у прораба</span>'}
+
+function viewForemanList(){
+  const items=S.objects.map(o=>{
+    const t=objTotals(o);
+    return `<button class="obj" data-act="openobj" data-id="${o.id}">
+      <span><span class="a">${esc(o.addr||'Без адреса')}</span><br><span class="m">${esc(o.client||'Заказчик не указан')} · ${o.rooms.length} комн. · пол ${f2(t.floor)} м²</span></span>
+      ${statusChip(o)}</button>`}).join('');
+  return `<div class="stack">
+    <div class="row between"><h2>Мои объекты</h2><button class="btn primary" data-act="newobj">+ Новый объект</button></div>
+    ${items||'<div class="empty">Объектов пока нет. Нажмите «Новый объект», чтобы начать замер.</div>'}
+  </div>`;
+}
+
+function roomCard(o,r){
+  const open=!!ui.open[r.id];
+  const c=roomCalc(o,r);
+  const nWorks=Object.values(r.works||{}).filter(w=>w.on).length;
+  const head=`<button class="room-h" data-act="toggleroom" data-rid="${r.id}" aria-expanded="${open}">
+    <span><span class="t">${esc(r.name||'Без названия')}</span> <span class="chip">${esc(r.type)}</span> ${nWorks?`<span class="chip ok">работ: ${nWorks}</span>`:'<span class="chip warn">работы не выбраны</span>'}</span>
+    <span class="s" data-live="rs:${r.id}">${liveVal('rs:'+r.id)}</span></button>`;
+  if(!open)return `<div class="card">${head}</div>`;
+  const ops=r.op.map(x=>`<div class="op">
+      <label class="f kind">Проём<select data-bind="op.k" data-rid="${r.id}" data-oid="${x.id}">${Object.entries(KINDS).map(([k,n])=>`<option value="${k}"${x.k===k?' selected':''}>${n}</option>`).join('')}</select></label>
+      <label class="f">Ширина, м<input type="text" inputmode="decimal" class="n" value="${esc(x.w)}" data-bind="op.w" data-rid="${r.id}" data-oid="${x.id}"></label>
+      <label class="f">Высота, м<input type="text" inputmode="decimal" class="n" value="${esc(x.h)}" data-bind="op.h" data-rid="${r.id}" data-oid="${x.id}"></label>
+      <button class="btn sm danger" data-act="delop" data-rid="${r.id}" data-oid="${x.id}" aria-label="Удалить проём">✕</button></div>`).join('');
+  const works=GROUPS.map(g=>`<div class="wg"><h3>${g}</h3>${WORKS.filter(w=>w.g===g).map(w=>{
+      const s=r.works[w.key]||{on:false,share:1};
+      return `<div class="wk"><label><input type="checkbox" data-act="togglework" data-rid="${r.id}" data-key="${w.key}"${s.on?' checked':''}> <span>${w.name} <span class="u">${w.unit}</span></span></label>
+        ${s.on?`<select data-bind="wk.share" data-rid="${r.id}" data-key="${w.key}" aria-label="Доля помещения">${SHARES.map(([v,n])=>`<option value="${v}"${(s.share||1)==v?' selected':''}>${n}</option>`).join('')}</select>`:'<span></span>'}</div>`}).join('')}</div>`).join('');
+  const delKey='room:'+r.id;
+  return `<div class="card stack">${head}
+    <div class="row" style="align-items:flex-start">
+      <div class="stack grow" style="min-width:240px">
+        <div class="grid">
+          <label class="f">Название<input type="text" value="${esc(r.name)}" data-bind="r.name" data-rid="${r.id}"></label>
+          <label class="f">Тип<select data-bind="r.type" data-rid="${r.id}">${TYPES.map(t=>`<option${r.type===t?' selected':''}>${t}</option>`).join('')}</select></label>
+        </div>
+        <div class="grid">
+          <label class="f">Длина, м<input type="text" inputmode="decimal" class="n" value="${esc(r.l)}" data-bind="r.l" data-rid="${r.id}"></label>
+          <label class="f">Ширина, м<input type="text" inputmode="decimal" class="n" value="${esc(r.w)}" data-bind="r.w" data-rid="${r.id}"></label>
+          <label class="f">Высота, м (если иная)<input type="text" inputmode="decimal" class="n" placeholder="${esc(o.h||'2.7')}" value="${esc(r.h)}" data-bind="r.h" data-rid="${r.id}"></label>
+          <label class="f">Поправка пола, м² (ниши, ±)<input type="text" inputmode="decimal" class="n" value="${esc(r.corr)}" data-bind="r.corr" data-rid="${r.id}"></label>
+        </div>
+      </div>
+      <div data-live="rsvg:${r.id}">${planSvg(r)}</div>
+    </div>
+    <div class="stack"><h3>Окна и двери</h3>${ops||'<div class="note" style="margin:0;background:var(--bg);color:var(--muted)">Проёмов нет. Добавьте окна и двери: по ним вычитаются стены и считаются откосы.</div>'}
+      <div class="row"><button class="btn sm" data-act="addop" data-rid="${r.id}" data-k="window">+ Окно</button><button class="btn sm" data-act="addop" data-rid="${r.id}" data-k="door">+ Дверь</button><button class="btn sm" data-act="addop" data-rid="${r.id}" data-k="balcony">+ Балконный блок</button></div></div>
+    <div><h3>Виды работ</h3>${works}</div>
+    <div class="row between"><button class="btn sm ghost" data-act="duproom" data-rid="${r.id}">Дублировать комнату</button>
+      <button class="btn sm danger" data-act="delroom" data-rid="${r.id}">${ui.confirm===delKey?'Точно удалить?':'Удалить комнату'}</button></div>
+  </div>`;
+}
+
+function viewForemanObj(o){
+  const rooms=o.rooms.map(r=>roomCard(o,r)).join('');
+  return `<div class="stack">
+    <div class="row between"><button class="btn sm ghost" data-act="back">← Все объекты</button>${statusChip(o)}</div>
+    <div class="card stack">
+      <h2>Объект</h2>
+      <div class="grid">
+        <label class="f" style="grid-column:1 / -1">Адрес<input type="text" value="${esc(o.addr)}" placeholder="Город, улица, дом, квартира" data-bind="o.addr"></label>
+        <label class="f">ФИО заказчика<input type="text" value="${esc(o.client)}" data-bind="o.client"></label>
+        <label class="f">Телефон<input type="text" inputmode="tel" value="${esc(o.phone)}" data-bind="o.phone"></label>
+        <label class="f">Высота потолков, м<input type="text" inputmode="decimal" class="n" value="${esc(o.h)}" data-bind="o.h"></label>
+      </div>
+    </div>
+    <div class="tiles">
+      <div class="tile"><b data-live="tot:rooms">${o.rooms.length}</b><span>комнат</span></div>
+      <div class="tile"><b data-live="tot:floor">${f2(objTotals(o).floor)}</b><span>площадь пола, м²</span></div>
+      <div class="tile"><b data-live="tot:wall">${f2(objTotals(o).wall)}</b><span>площадь стен, м²</span></div>
+      <div class="tile"><b data-live="tot:ceil">${f2(objTotals(o).ceil)}</b><span>площадь потолка, м²</span></div>
+    </div>
+    ${rooms}
+    <button class="btn primary" data-act="addroom">+ Добавить комнату</button>
+    <div class="row"><button class="btn sm danger" data-act="delobj">${ui.confirm==='obj'?'Точно удалить объект?':'Удалить объект'}</button></div>
+  </div>`;
+}
+function barForeman(o){
+  if(!o)return '';
+  return `<div class="bar"><div class="in"><span>${o.status==='sent'?'Замеры у менеджера. Можно вернуть в черновик и поправить.':'Проверьте замеры и отправьте менеджеру.'}</span>
+    ${o.status==='sent'?'<button class="btn" data-act="unsend">Вернуть в черновик</button>':'<button class="btn primary" data-act="send">Отправить менеджеру</button>'}</div></div>`;
+}
+
+/* ---------- Отрисовка: менеджер ---------- */
+function viewManagerList(){
+  const items=S.objects.map(o=>{
+    const t=objTotals(o),e=estimate(o);
+    return `<button class="obj" data-act="mopen" data-id="${o.id}">
+      <span><span class="a">${esc(o.addr||'Без адреса')}</span><br><span class="m">${esc(o.client||'Заказчик не указан')} · пол ${f2(t.floor)} м² · стены ${f2(t.wall)} м²</span></span>
+      <span class="row"><span class="mono">${rub(e.total)}</span>${statusChip(o)}</span></button>`}).join('');
+  return `<div class="stack"><h2>Объекты для расчёта</h2>${items||'<div class="empty">Пока нет объектов от прорабов.</div>'}</div>`;
+}
+function viewEstimate(o){
+  const e=estimate(o);
+  const rows=e.groups.map(g=>`<tr class="g"><td colspan="6">${g.name}</td></tr>`+g.lines.map(l=>`<tr>
+    <td><div>${l.name}</div><div class="det">${l.parts.map(p=>`${esc(p.room)}: ${f2(p.q)}`).join(' · ')}</div></td>
+    <td>${l.unit}</td>
+    <td><input type="text" inputmode="decimal" class="n${l.qOv?' ov':''}" value="${f2(l.qty).replace(/\s/g,'')}" data-bind="m.qty" data-key="${l.key}" aria-label="Объём"></td>
+    <td><input type="text" inputmode="decimal" class="n${l.pOv?' ov':''}" value="${l.price}" data-bind="m.price" data-key="${l.key}" aria-label="Цена"></td>
+    <td class="sum" data-live="ls:${l.key}">${rub(l.sum)}</td>
+    <td><button class="btn sm ghost" data-act="mrm" data-key="${l.key}" aria-label="Убрать позицию">✕</button></td></tr>`).join('')).join('');
+  const custom=e.custom.map(c=>`<tr>
+    <td><input type="text" value="${esc(c.name)}" placeholder="Название работы" data-bind="c.name" data-cid="${c.id}"></td>
+    <td><input type="text" value="${esc(c.unit)}" style="width:70px" data-bind="c.unit" data-cid="${c.id}"></td>
+    <td><input type="text" inputmode="decimal" class="n" value="${esc(c.qty)}" data-bind="c.qty" data-cid="${c.id}"></td>
+    <td><input type="text" inputmode="decimal" class="n" value="${esc(c.price)}" data-bind="c.price" data-cid="${c.id}"></td>
+    <td class="sum" data-live="cs:${c.id}">${rub(c.sum)}</td>
+    <td><button class="btn sm ghost" data-act="mdelc" data-cid="${c.id}" aria-label="Удалить строку">✕</button></td></tr>`).join('');
+  const customHead=e.custom.length?'<tr class="g"><td colspan="6">Дополнительно</td></tr>':'';
+  const removed=e.removed.length?`<div class="row"><span class="note" style="margin:0">Убраны из сметы:</span>${e.removed.map(w=>`<button class="btn sm" data-act="mrestore" data-key="${w.key}">${w.name} ↺</button>`).join('')}</div>`:'';
+  const empty=!e.groups.length&&!e.custom.length?'<div class="empty">Прораб пока не выбрал виды работ ни в одной комнате.</div>':'';
+  const warn=o.rooms.filter(r=>!Object.values(r.works||{}).some(w=>w.on)).map(r=>r.name);
+  return `<div class="stack">
+    <div class="row between"><button class="btn sm ghost" data-act="mback">← Все объекты</button>${statusChip(o)}</div>
+    <div class="card"><h2>${esc(o.addr||'Без адреса')}</h2><div class="m" style="color:var(--muted)">${esc(o.client)} ${esc(o.phone)} · высота ${esc(o.h||'2.7')} м · пол ${f2(objTotals(o).floor)} м² · стены ${f2(objTotals(o).wall)} м²</div></div>
+    ${warn.length?`<div class="note" style="margin:0">Без работ в смете: ${warn.map(esc).join(', ')}. Уточните у прораба, что делаем в этих помещениях.</div>`:''}
+    <div class="seg" style="align-self:flex-start"><button data-act="mtab" data-v="estimate" aria-pressed="true">Смета</button><button data-act="mtab" data-v="kp" aria-pressed="false">Коммерческое предложение</button></div>
+    <div class="card">
+      <div class="tw"><table class="est"><thead><tr><th>Работа</th><th>Ед.</th><th>Объём</th><th>Цена, ₽</th><th style="text-align:right">Сумма</th><th></th></tr></thead>
+      <tbody>${rows}${customHead}${custom}</tbody></table></div>
+      ${empty}${removed}
+      <div class="row" style="margin-top:10px"><button class="btn sm" data-act="maddc">+ Добавить свою позицию</button></div>
+      <div class="tot">
+        <div><span>Итого по работам</span><span class="mono" data-live="t:sub">${rub(e.sub)}</span></div>
+        <div><label class="f" style="flex-direction:row;align-items:center;gap:8px">Скидка, %<input type="text" inputmode="decimal" class="n" style="width:70px" value="${esc(o.mgr.disc)}" data-bind="m.disc"></label><span class="mono" data-live="t:disc">−${rub(e.disc)}</span></div>
+        <div><span>К оплате</span><span class="big" data-live="t:total">${rub(e.total)}</span></div>
+      </div>
+    </div>
+    <div class="note" style="margin:0">Объём и цену можно править. Изменённые значения подсвечены синим, чтобы вернуть расчётное, очистите поле.</div>
+  </div>`;
+}
+function viewKp(o){
+  const e=estimate(o);
+  const rows=e.groups.map(g=>`<tr class="g"><td colspan="5">${g.name}</td></tr>`+g.lines.map((l,i)=>`<tr><td>${i+1}</td><td>${l.name}</td><td class="r">${f2(l.qty)} ${l.unit}</td><td class="r">${rub(l.price)}</td><td class="r">${rub(l.sum)}</td></tr>`).join('')).join('')
+    +(e.custom.length?`<tr class="g"><td colspan="5">Дополнительно</td></tr>`+e.custom.map((c,i)=>`<tr><td>${i+1}</td><td>${esc(c.name)}</td><td class="r">${esc(c.qty)} ${esc(c.unit)}</td><td class="r">${rub(num(c.price))}</td><td class="r">${rub(c.sum)}</td></tr>`).join(''):'');
+  return `<div class="stack">
+    <div class="row between"><button class="btn sm ghost" data-act="mback">← Все объекты</button><span class="row"><button class="btn" data-act="mtab" data-v="estimate">К смете</button><button class="btn primary" data-act="copykp">Скопировать текст КП</button></span></div>
+    <div class="note" style="margin:0">В этом окне печать и скачивание файлов заблокированы. Кнопка выгрузки PDF появится в рабочей версии, пока можно скопировать текст.</div>
+    <div class="paper">
+      <h2>Коммерческое предложение</h2>
+      <div class="meta">на ремонтные работы · ${new Date().toLocaleDateString('ru-RU')}</div>
+      <p style="margin:14px 0 0"><b>Объект:</b> ${esc(o.addr)}<br><b>Заказчик:</b> ${esc(o.client)} ${esc(o.phone)}<br><b>Площадь пола:</b> ${f2(objTotals(o).floor)} м², <b>стен:</b> ${f2(objTotals(o).wall)} м²</p>
+      <table><thead><tr><th>№</th><th>Вид работ</th><th class="r">Объём</th><th class="r">Цена</th><th class="r">Сумма</th></tr></thead><tbody>${rows}</tbody></table>
+      ${e.disc>0?`<div class="meta" style="text-align:right">Итого: ${rub(e.sub)} · скидка ${f2(e.dp)}%: −${rub(e.disc)}</div>`:''}
+      <div class="total"><b>К оплате: ${rub(e.total)}</b></div>
+      <p class="meta">Стоимость материалов в предложение не входит. Предложение действует 14 дней.</p>
+    </div></div>`;
+}
+function kpText(o){
+  const e=estimate(o);let t=`Коммерческое предложение\nОбъект: ${o.addr}\nЗаказчик: ${o.client} ${o.phone}\n\n`;
+  e.groups.forEach(g=>{t+=g.name.toUpperCase()+'\n';g.lines.forEach(l=>{t+=`- ${l.name}: ${f2(l.qty)} ${l.unit} × ${rub(l.price)} = ${rub(l.sum)}\n`});t+='\n'});
+  if(e.custom.length){t+='ДОПОЛНИТЕЛЬНО\n';e.custom.forEach(c=>{t+=`- ${c.name}: ${c.qty} ${c.unit} × ${rub(num(c.price))} = ${rub(c.sum)}\n`});t+='\n'}
+  if(e.disc>0)t+=`Скидка ${f2(e.dp)}%: −${rub(e.disc)}\n`;
+  return t+`К оплате: ${rub(e.total)}`;
+}
+
+/* ---------- Главный рендер ---------- */
+function render(){
+  document.getElementById('r-foreman').setAttribute('aria-pressed',ui.view==='foreman');
+  document.getElementById('r-manager').setAttribute('aria-pressed',ui.view==='manager');
+  const app=document.getElementById('app'),bar=document.getElementById('bar');
+  const o=curObj();
+  if(ui.view==='foreman'){
+    app.innerHTML=o?viewForemanObj(o):viewForemanList();
+    bar.innerHTML=o?barForeman(o):'';
+  }else{
+    bar.innerHTML='';
+    if(!o)app.innerHTML=viewManagerList();
+    else{
+      app.innerHTML=ui.tab==='kp'?viewKp(o):viewEstimate(o);
+      app.querySelectorAll('[data-act="mtab"]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.tab));
+    }
+  }
+}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>{t.hidden=true},3200)}
+
+/* ---------- Действия ---------- */
+function act(a,d){
+  const o=curObj();
+  if(a!=='delroom'&&a!=='delobj')ui.confirm=null;
+  switch(a){
+    case 'role':ui.view=d.v;ui.oid=null;ui.tab='estimate';break;
+    case 'newobj':{const n={id:uid(),addr:'',client:'',phone:'',h:'2.7',status:'draft',rooms:[],mgr:{qty:{},price:{},removed:{},custom:[],disc:''}};
+      const r=mkRoom('Комната 1','Комната','','',[],{});n.rooms.push(r);ui.open[r.id]=true;S.objects.unshift(n);ui.oid=n.id;break}
+    case 'openobj':ui.oid=d.id;break;
+    case 'back':case 'mback':ui.oid=null;ui.tab='estimate';break;
+    case 'mopen':ui.oid=d.id;ui.tab='estimate';break;
+    case 'toggleroom':ui.open[d.rid]=!ui.open[d.rid];break;
+    case 'addroom':{const last=o.rooms[o.rooms.length-1];const w=last?JSON.parse(JSON.stringify(last.works)):{};
+      const r=mkRoom('Комната '+(o.rooms.length+1),'Комната','','',[],w);o.rooms.push(r);ui.open[r.id]=true;break}
+    case 'duproom':{const r=findRoom(o,d.rid),c=JSON.parse(JSON.stringify(r));c.id=uid();c.name=r.name+' (копия)';c.op.forEach(x=>x.id=uid());o.rooms.splice(o.rooms.indexOf(r)+1,0,c);ui.open[c.id]=true;break}
+    case 'delroom':{const k='room:'+d.rid;if(ui.confirm===k){o.rooms=o.rooms.filter(r=>r.id!==d.rid);ui.confirm=null}else ui.confirm=k;break}
+    case 'delobj':{if(ui.confirm==='obj'){S.objects=S.objects.filter(x=>x.id!==o.id);ui.oid=null;ui.confirm=null}else ui.confirm='obj';break}
+    case 'addop':{const r=findRoom(o,d.rid);const dim={window:['1.4','1.4'],door:['0.9','2.0'],balcony:['1.5','2.3']}[d.k];r.op.push({id:uid(),k:d.k,w:dim[0],h:dim[1]});break}
+    case 'delop':{const r=findRoom(o,d.rid);r.op=r.op.filter(x=>x.id!==d.oid);break}
+    case 'send':{
+      if(!o.addr.trim()){toast('Укажите адрес объекта');return}
+      if(!o.rooms.some(r=>num(r.l)&&num(r.w))){toast('Добавьте хотя бы одну комнату с размерами');return}
+      if(!o.rooms.some(r=>Object.values(r.works).some(w=>w.on))){toast('Отметьте виды работ хотя бы в одной комнате');return}
+      o.status='sent';toast('Отправлено менеджеру');break}
+    case 'unsend':o.status='draft';break;
+    case 'mtab':ui.tab=d.v;break;
+    case 'mrm':o.mgr.removed[d.key]=true;break;
+    case 'mrestore':delete o.mgr.removed[d.key];break;
+    case 'maddc':o.mgr.custom.push({id:uid(),name:'',unit:'шт.',qty:'1',price:''});break;
+    case 'mdelc':o.mgr.custom=o.mgr.custom.filter(c=>c.id!==d.cid);break;
+    case 'copykp':{const txt=kpText(o);
+      try{navigator.clipboard.writeText(txt).then(()=>toast('Текст КП скопирован'),()=>toast('Не удалось скопировать, выделите текст в окне вручную'))}catch(e){toast('Не удалось скопировать, выделите текст в окне вручную')}
+      return}
+  }
+  save();render();
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');
+  if(!b||b.tagName==='INPUT')return;
+  act(b.dataset.act,b.dataset);
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset.act==='togglework'){
+    const o=curObj(),r=findRoom(o,t.dataset.rid);
+    r.works[t.dataset.key]={on:t.checked,share:(r.works[t.dataset.key]||{}).share||1};
+    save();render();
+  }
+});
+function bind(t){
+  const o=curObj();if(!o)return;const d=t.dataset,v=t.value,[s,f]=d.bind.split('.');
+  if(s==='o')o[f]=v;
+  else if(s==='r')findRoom(o,d.rid)[f]=v;
+  else if(s==='op')findRoom(o,d.rid).op.find(x=>x.id===d.oid)[f]=v;
+  else if(s==='wk'){const r=findRoom(o,d.rid);r.works[d.key].share=num(v)||1}
+  else if(s==='m'){
+    if(f==='disc')o.mgr.disc=v;
+    else{const m=o.mgr[f];if(v.trim()==='')delete m[d.key];else m[d.key]=num(v);t.classList.toggle('ov',v.trim()!=='')}
+  }
+  else if(s==='c')o.mgr.custom.find(c=>c.id===d.cid)[f]=v;
+  save();updateLive();
+}
+document.addEventListener('input',e=>{if(e.target.dataset&&e.target.dataset.bind)bind(e.target)});
+document.addEventListener('change',e=>{if(e.target.tagName==='SELECT'&&e.target.dataset.bind)bind(e.target)});
+render();
+</script>
+</body>
+</html>
